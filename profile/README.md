@@ -6,7 +6,7 @@ Managed IT and security services (MSP/MSSP). We automate our own operations and 
 
 Open-source [Model Context Protocol](https://modelcontextprotocol.io) servers for the platforms we run:
 
-- [proxmox-mcp-server](https://github.com/NightSquawk/proxmox-mcp-server): Proxmox VE + Datacenter Manager, the full API behind three catalog tools
+- [proxmox-mcp-server](https://github.com/NightSquawk/proxmox-mcp-server): Proxmox VE + Datacenter Manager, the full API behind six catalog tools
 - [tacticalrmm-mcp-server](https://github.com/NightSquawk/tacticalrmm-mcp-server): TacticalRMM agents, checks, alerts, and audit logs
 - [kimai-mcp-server](https://github.com/NightSquawk/kimai-mcp-server): Kimai time tracking with guarded writes
 - [gohighlevel-mcp-server](https://github.com/NightSquawk/gohighlevel-mcp-server): GoHighLevel CRM, including the gaps the official MCP leaves open
