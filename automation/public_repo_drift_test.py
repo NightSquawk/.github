@@ -25,4 +25,25 @@ class ApiEvidenceTests(unittest.TestCase):
         self.assertNotIn('unresolved-review-threads-permitted',result['drift'])
         self.assertIn('missing-version-tag-protection',result['drift'])
 
+    def test_flow_style_actions_are_found_without_matching_shell_text(self):
+        body='''jobs:
+  build:
+    steps: [{ uses: actions/checkout@v4 }]
+  shell:
+    steps:
+      - run: |
+          uses: not/an-action@v1
+'''
+        self.assertEqual(audit.action_references(body),['actions/checkout@v4'])
+
+    def test_all_tag_protection_covers_version_tags(self):
+        def response(path,paginate=False):
+            if '/rules/branches/' in path:return []
+            if '/rulesets?' in path:return [{'id':1,'target':'tag','enforcement':'active'}]
+            if '/rulesets/1' in path:return {'conditions':{'ref_name':{'include':['~ALL'],'exclude':[]}},'rules':[{'type':'update'},{'type':'deletion'}]}
+            return {'tree':[]}
+        with patch.object(audit,'api',side_effect=response):
+            result=audit.audit({'full_name':'example/repo','default_branch':'main'})
+        self.assertNotIn('missing-version-tag-protection',result['drift'])
+
 if __name__=='__main__':unittest.main()

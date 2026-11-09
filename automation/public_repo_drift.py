@@ -3,6 +3,18 @@
 import argparse, base64, concurrent.futures, datetime, json, re, subprocess
 from pathlib import Path
 from urllib.parse import quote
+import yaml
+
+def action_references(body):
+    workflow=yaml.safe_load(body)
+    if not isinstance(workflow,dict):return []
+    refs=[]
+    for job in workflow.get('jobs',{}).values():
+        if not isinstance(job,dict):continue
+        if isinstance(job.get('uses'),str):refs.append(job['uses'])
+        for step in job.get('steps',[]):
+            if isinstance(step,dict) and isinstance(step.get('uses'),str):refs.append(step['uses'])
+    return refs
 
 def api(path,paginate=False):
     args=['gh','api',path]
@@ -42,7 +54,8 @@ def audit(repo):
             included=detail.get('conditions',{}).get('ref_name',{}).get('include',[])
             excluded=detail.get('conditions',{}).get('ref_name',{}).get('exclude',[])
             types={r['type'] for r in detail.get('rules',[])}
-            if 'refs/tags/v*' in included and not excluded and {'update','deletion'}<=types:protected=True
+            covers_versions=any(p in included for p in ['refs/tags/v*','refs/tags/*','refs/tags/**','~ALL'])
+            if covers_versions and not excluded and {'update','deletion'}<=types:protected=True
         if not protected:result['drift'].append('missing-version-tag-protection')
     else:result['unknown'].append('tag-rulesets:'+sets['unavailable'])
     tree=api(root+'/git/trees/'+quote(branch,safe='')+'?recursive=1')
@@ -56,8 +69,10 @@ def audit(repo):
             if 'unavailable' in blob:
                 result['unknown'].append('workflow-read:'+path);continue
             body=base64.b64decode(blob.get('content','')).decode()
-            for match in re.finditer(r'(?m)^\s*-?\s*uses:\s*[\'\"]?([^\s\'\"#]+)',body):
-                action=match[1]
+            try:references=action_references(body)
+            except yaml.YAMLError:
+                result['unknown'].append('invalid-workflow-yaml:'+path);continue
+            for action in references:
                 if action.startswith(('./','docker://')):continue
                 if not re.search(r'@[0-9a-f]{40}$',action):result['drift'].append('unpinned-workflow-reference:'+path)
     return result
