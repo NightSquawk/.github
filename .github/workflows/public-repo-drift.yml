@@ -22,6 +22,14 @@ jobs:
           python-version: '3.12'
       - name: Check script syntax
         run: python -m py_compile automation/public_repo_drift.py
+      - name: Verify read-only access to public audit targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api 'users/NightSquawk/repos?type=owner&per_page=100' --jq length
+          gh api repos/NightSquawk/mcp-core/rules/branches/v1.0.0 --jq length
+          gh api repos/Kvrnn/CodeTimer/rules/branches/main --jq length
+          gh api repos/Kvrnn/CodeTimer/git/trees/main --jq .sha
       - name: Audit public baseline
         if: github.event_name != 'pull_request'
         env:

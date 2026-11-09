@@ -7,7 +7,12 @@ from urllib.parse import quote
 def api(path,paginate=False):
     args=['gh','api',path]
     if paginate:args+=['--paginate','--slurp']
-    p=subprocess.run(args,capture_output=True,text=True,timeout=60)
+    try:
+        p=subprocess.run(args,capture_output=True,text=True,timeout=60)
+    except subprocess.TimeoutExpired:
+        return {'unavailable':'timeout'}
+    except OSError:
+        return {'unavailable':'client-unavailable'}
     if p.returncode:
         match=re.search(r'HTTP (\d+)',p.stderr)
         return {'unavailable':match.group(1) if match else 'request-failed'}
@@ -66,7 +71,11 @@ def main():
         data=api('users/'+owner+'/repos?type=owner&per_page=100',True)
         if not isinstance(data,list):errors.append(owner+':'+data['unavailable']);continue
         inventory.extend(r for r in data if not r.get('private') and not r.get('archived') and r['owner']['login'].lower()==owner.lower())
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(audit,inventory))
+    def guarded_audit(repo):
+        try:return audit(repo)
+        except Exception:
+            return {'repository':repo['full_name'],'default_branch':repo['default_branch'],'drift':[],'unknown':['audit-error']}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(guarded_audit,inventory))
     report={'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'scope':'Active public repositories; default-branch rules, version-tag rules and workflow SHA references only. Security feature/admin settings need an administrator audit.','inventory_errors':errors,'repositories':results}
     Path(args.output).write_text(json.dumps(report,indent=2)+'\n')
     for r in results:print(r['repository']+': '+str(len(r['drift']))+' drift, '+str(len(r['unknown']))+' unknown')
