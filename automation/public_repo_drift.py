@@ -16,6 +16,12 @@ def action_references(body):
             if isinstance(step,dict) and isinstance(step.get('uses'),str):refs.append(step['uses'])
     return refs
 
+def may_exclude_version_tags(pattern):
+    if pattern=='~ALL':return True
+    literal=re.split(r'[*?\[]',pattern,maxsplit=1)[0]
+    version_prefix='refs/tags/v'
+    return version_prefix.startswith(literal) or literal.startswith(version_prefix)
+
 def api(path,paginate=False):
     args=['gh','api',path]
     if paginate:args+=['--paginate','--slurp']
@@ -46,7 +52,8 @@ def audit(repo):
     sets=api(root+'/rulesets?includes_parents=true&per_page=100',True)
     if isinstance(sets,list):
         tag_sets=[s for s in sets if s.get('target')=='tag' and s.get('enforcement')=='active']
-        protected=False
+        effective_tag_rules=set()
+        uncertain_tag_conditions=False
         for ruleset in tag_sets:
             detail=api(root+'/rulesets/'+str(ruleset['id']))
             if 'unavailable' in detail:
@@ -55,8 +62,13 @@ def audit(repo):
             excluded=detail.get('conditions',{}).get('ref_name',{}).get('exclude',[])
             types={r['type'] for r in detail.get('rules',[])}
             covers_versions=any(p in included for p in ['refs/tags/v*','refs/tags/*','refs/tags/**','~ALL'])
-            if covers_versions and not excluded and {'update','deletion'}<=types:protected=True
-        if not protected:result['drift'].append('missing-version-tag-protection')
+            if covers_versions:
+                if any(may_exclude_version_tags(p) for p in excluded):
+                    uncertain_tag_conditions=True
+                else:effective_tag_rules.update(types)
+        if not {'update','deletion'}<=effective_tag_rules:
+            if uncertain_tag_conditions:result['unknown'].append('version-tag-exclusions-need-review')
+            else:result['drift'].append('missing-version-tag-protection')
     else:result['unknown'].append('tag-rulesets:'+sets['unavailable'])
     tree=api(root+'/git/trees/'+quote(branch,safe='')+'?recursive=1')
     if tree.get('truncated') or 'unavailable' in tree:

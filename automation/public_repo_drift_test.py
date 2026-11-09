@@ -46,4 +46,18 @@ class ApiEvidenceTests(unittest.TestCase):
             result=audit.audit({'full_name':'example/repo','default_branch':'main'})
         self.assertNotIn('missing-version-tag-protection',result['drift'])
 
+    def test_non_version_exclusions_do_not_remove_version_protection(self):
+        self.assertFalse(audit.may_exclude_version_tags('refs/tags/test-*'))
+        self.assertTrue(audit.may_exclude_version_tags('refs/tags/v1.*'))
+
+    def test_tag_rules_are_combined_across_matching_rulesets(self):
+        def response(path,paginate=False):
+            if '/rules/branches/' in path:return []
+            if '/rulesets?' in path:return [{'id':n,'target':'tag','enforcement':'active'} for n in [1,2]]
+            if '/rulesets/' in path:return {'conditions':{'ref_name':{'include':['~ALL'],'exclude':['refs/tags/test-*']}},'rules':[{'type':'update' if path.endswith('/1') else 'deletion'}]}
+            return {'tree':[]}
+        with patch.object(audit,'api',side_effect=response):
+            result=audit.audit({'full_name':'example/repo','default_branch':'main'})
+        self.assertNotIn('missing-version-tag-protection',result['drift'])
+
 if __name__=='__main__':unittest.main()
