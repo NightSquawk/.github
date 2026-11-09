@@ -1,0 +1,36 @@
+name: Public repository baseline audit
+on:
+  schedule:
+    - cron: '0 15 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - automation/public_repo_drift.py
+      - .github/workflows/public-repo-drift.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.12'
+      - name: Check script syntax
+        run: python -m py_compile automation/public_repo_drift.py
+      - name: Audit public baseline
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python automation/public_repo_drift.py --output "$RUNNER_TEMP/public-repo-drift.json"
+      - name: Upload audit evidence
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: public-repo-drift
+          path: ${{ runner.temp }}/public-repo-drift.json
+          retention-days: 30

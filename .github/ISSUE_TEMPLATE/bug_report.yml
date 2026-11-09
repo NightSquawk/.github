@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a reproducible problem without sensitive data.
+body:
+  - type: markdown
+    attributes:
+      value: "For suspected vulnerabilities, follow SECURITY.md instead of opening a public issue. Never include credentials or customer data."
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Relevant OS, runtime and installation method. Exclude private infrastructure details.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use synthetic data and list the steps to reproduce.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
