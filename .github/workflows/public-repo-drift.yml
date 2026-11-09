@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Check script syntax
-        run: python -m py_compile automation/public_repo_drift.py
+        run: python -m unittest discover -s automation -p "*_test.py" -v
       - name: Verify read-only access to public audit targets
         env:
           GH_TOKEN: ${{ github.token }}
